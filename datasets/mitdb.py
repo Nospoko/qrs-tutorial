@@ -3,7 +3,6 @@ import h5py
 import numpy as np
 import pandas as pd
 from glob import glob
-from utils import signal as us
 from utils import download as ud
 from matplotlib import pyplot as plt
 
@@ -34,86 +33,6 @@ def good_annotations():
                         13, 16, 31, 38]
 
     return good_annotations
-
-def make_qrs_set(path, params):
-    """ Super sick """
-    # Desired net input
-    in_shape = params[0]
-    # Resolution up-factor
-    r_factor = params[1]
-    out_shape = in_shape * r_factor
-    # Make sure it is divisible
-    half = out_shape / 2
-
-    # Get data
-    data, _, ann = us.read_signal(path, 0, -1)
-    cha = data[:, 2]
-
-    # Normalize a little [0 -- 1]
-    cha -= cha.min()
-    cha /= cha.max()
-
-    # Output containers
-    x_out, y_out = [], []
-
-    for idx in ann[:, 0].astype(int):
-        # Get high res
-        qrs = cha[idx - half : idx + half]
-        if len(qrs) == out_shape:
-            # Make low res
-            x_out.append(qrs[::r_factor])
-            y_out.append(qrs)
-        else:
-            # Not wanted
-            # print qrs.shape
-            pass
-
-    x_out = np.array(x_out)
-    y_out = np.array(y_out)
-
-    return x_out, y_out 
-
-def make_set(path, params):
-    """ Sequence specific """
-    # Get data
-    data, _, __ = us.read_signal(path, 0, -1)
-    cha = data[:, 2]
-
-    # Make it so mean == 0 and var == 1
-    cha -= cha.mean()
-    cha /= cha.std()
-
-    # Desired net input
-    in_shape = params[0]
-    # Resolution up-factor
-    r_factor = params[1]
-
-    # This will be the inputs
-    lowres = cha[::r_factor]
-
-    # Chop chop chop
-    sta = 0
-    end = in_shape
-    stride = int(in_shape/3)
-
-    # Output containers
-    x_out, y_out = [], []
-
-    while end < len(lowres):
-        # Get fragments
-        x = lowres[sta : end]
-        y = cha[sta * r_factor : end * r_factor]
-
-        x_out.append(x)
-        y_out.append(y)
-
-        sta += stride
-        end += stride
-
-    x_out = np.array(x_out)
-    y_out = np.array(y_out)
-
-    return x_out, y_out
 
 def make_hdf(savepath, params = [1024, 2]):
     """ Sick """

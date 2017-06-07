@@ -10,17 +10,30 @@ print 'There are {} record files'.format(len(records))
 path = records[0]
 print 'Loading file:', path
 
-# Number of samples to read in
-howmany = 1000
-
 # Read in the data ...
-record = wf.rdsamp(records[0], sampto = howmany)
+record = wf.rdsamp(records[0])
 
 # .. and annotations
-annotation = wf.rdann(records[0], 'atr', sampto = howmany)
+annotation = wf.rdann(records[0], 'atr')
 
-# Print some data
-print 'Sampling frequency used for this record:', record.fs
-print 'Shape of loaded data array:', record.p_signals.shape
-print 'Number of loaded annotations:', len(annotation.annids)
-print 'Third annotation is of type:', annotation.anntype[2]
+from matplotlib import pyplot as plt
+
+# Select one of the channels (there are two)
+chid = 0
+data = record.p_signals
+channel = data[:, chid]
+
+print 'ECG channel type:', record.signame[chid]
+
+# Plot only the first 2000 samples
+howmany = 2000
+
+# Calculate time values in seconds
+times = np.arange(howmany, dtype = 'float') / record.fs
+plt.plot(times, channel[ : howmany])
+plt.xlabel('Time [s]')
+plt.xlim([0, 5])
+plt.show()
+
+
+
