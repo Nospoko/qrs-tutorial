@@ -139,3 +139,20 @@ def convert_data(data, annotations):
 
     return signals, labels
 
+def create_datasets():
+    """ Training, validation, test """
+    # Prepare paths
+    records = get_records()
+
+    # Shuffle up determinitically
+    np.random.seed(666)
+    np.random.shuffle(records)
+
+    # Make training
+    make_dataset(records[:30], 'data/training')
+
+    # ... validation ...
+    make_dataset(records[30 : 39], 'data/validation')
+
+    # ... and test
+    make_dataset(records[39 : 48], 'data/test')
