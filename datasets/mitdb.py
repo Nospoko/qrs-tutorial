@@ -1,8 +1,10 @@
 import os
 import h5py
+import wfdb as wf
 import numpy as np
 import pandas as pd
 from glob import glob
+from scipy import signal as ss
 from utils import download as ud
 from matplotlib import pyplot as plt
 
@@ -24,6 +26,43 @@ def get_records():
 
     return paths
 
+def good_types():
+    """ Of annotations """
+    # www.physionet.org/physiobank/annotations.shtml
+    good = ['N', 'L', 'R', 'B', 'A',
+            'a', 'J', 'S', 'V', 'r',
+            'F', 'e', 'j', 'n', 'E',
+            '/', 'f', 'Q', '?']
+
+    return good
+
+def beat_annotations(annotation):
+    """ Get rid of non-beat markers """
+    # Declare beat types
+    good = good_types()
+    ids = np.in1d(annotation.anntype, good)
+
+    # We want to know only the positions
+    beats = annotation.annsamp[ids]
+
+    return beats
+
+def convert_input(channel, annotation):
+    """ Into output """
+    # Remove non-beat annotations
+    beats = beat_annotations(annotation)
+
+    # Create dirac-comb signal
+    dirac = np.zeros_like(channel)
+    dirac[beats] = 1.0
+
+    # Use hamming window as a bell-curve filter
+    width = 36
+    filter = ss.hamming(width)
+    gauss = np.convolve(filter, dirac, mode = 'same')
+
+    return dirac, gauss
+
 def good_annotations():
     """ Const function with good annotations """
     # For now it seems those are most popular
@@ -34,45 +73,69 @@ def good_annotations():
 
     return good_annotations
 
-def make_hdf(savepath, params = [1024, 2]):
-    """ Sick """
-    # Prepare dataset defining parameters
-    in_shape = params[0]
-    r_factor = params[1]
-    params = [in_shape, r_factor]
+def make_dataset(records, savepath):
+    """ Inside an array """
+    # Prepare containers
+    signals, labels = [], []
 
-    sigsize = in_shape
-    labsize = in_shape * r_factor
+    # Iterate files
+    for path in records:
+        print 'Processing file:', path
+        record = wf.rdsamp(path)
+        annotations = wf.rdann(path, 'atr')
 
-    paths = get_records()
+        # Extract pure signals
+        data = record.p_signals
 
-    with h5py.File(savepath, 'w') as db:
-        sigshape = [1000, sigsize]
-        sigmax = [None, sigsize]
-        sigset = db.create_dataset('training/inputs',
-                                    shape = sigshape,
-                                    maxshape = sigmax)
+        # Convert each channel into labeled fragments
+        signal, label = convert_data(data, annotations)
 
-        labshape = [1000, labsize]
-        labmax = [None, labsize]
-        labset = db.create_dataset('training/outputs',
-                                    shape = labshape,
-                                    maxshape = labmax)
+        # Cumulate
+        signals.append(signal)
+        labels.append(label)
 
-        end = 0
-        for path in paths:
-            print 'Making data from:', path
-            # inputs, outputs = make_qrs_set(path, params)
-            inputs, outputs = make_set(path, params)
+    # Convert to one huge numpy.array
+    signals = np.vstack(signals)
+    labels = np.vstack(labels)
 
-            sta = end
-            end += inputs.shape[0]
+    # Write to disk
+    np.save(savepath, {'signals' : signals,
+                       'labels'  : labels })
 
-            sigset.resize([end, sigsize])
-            sigset[sta : end] = inputs
+def convert_data(data, annotations):
+    """ Into a batch """
+    # Prepare containers
+    signals, labels = [], []
 
-            labset.resize([end, labsize])
-            labset[sta : end] = outputs
+    # Convert both channels
+    for it in range(2):
+        channel = data[:, it]
+        dirac, gauss = convert_input(channel,
+                                     annotations)
+        # Merge labels
+        label = np.vstack([dirac, gauss])
 
-    print 'Dataset saved into:', savepath
+        # Prepare the moving window
+        width = 300
+        sta = 0
+        end = width
+        stride = 300
+        while end <= len(channel):
+            # Chop out the fragments
+            s_frag = channel[sta : end]
+            l_frag = label[:, sta : end]
+
+            # Cumulate
+            signals.append(s_frag)
+            labels.append(l_frag)
+
+            # Go forth
+            sta += stride
+            end += stride
+
+    # Turn into arrays
+    signals = np.array(signals)
+    labels = np.array(labels)
+
+    return signals, labels
 

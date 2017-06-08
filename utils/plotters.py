@@ -1,5 +1,6 @@
 import wfdb as wf
 import numpy as np
+from scipy import signal as ss
 from datasets import mitdb as dm
 from matplotlib import pyplot as plt
 
@@ -76,7 +77,7 @@ def show_objective():
 
     # These were found manually
     sta = 184000
-    end = 185000
+    end = sta + 1000
     times = np.arange(end-sta, dtype = 'float')
     times /= record.fs
 
@@ -85,20 +86,35 @@ def show_objective():
     samples = ann.annsamp[where] - sta
     print samples
 
+    # Prepare dirac-comb type of labels
     qrs_values = np.zeros_like(times)
     qrs_values[samples] = 1
 
+    # Prepare gaussian-comb type of labels
+    kernel = ss.hamming(36)
+    qrs_gauss = np.convolve(kernel,
+                            qrs_values,
+                            mode = 'same')
+
+    # Make the plots
     fig = plt.figure()
-    ax1 = fig.add_subplot(2,1,1)
+    ax1 = fig.add_subplot(3,1,1)
     ax1.plot(times, cha[sta : end])
 
-    ax2 = fig.add_subplot(2,1,2, sharex=ax1)
+    ax2 = fig.add_subplot(3,1,2, sharex=ax1)
     ax2.plot(times,
              qrs_values,
              'C1',
              lw = 4,
              alpha = 0.888)
+    ax3 = fig.add_subplot(3,1,3, sharex=ax1)
+    ax3.plot(times,
+             qrs_gauss,
+             'C3',
+             lw = 4,
+             alpha = 0.888)
     plt.setp(ax1.get_xticklabels(), visible=False)
+    plt.setp(ax2.get_xticklabels(), visible=False)
     plt.xlabel('Time [s]')
     plt.xlim([0, 2.5])
     plt.show()
