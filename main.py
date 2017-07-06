@@ -4,4 +4,8 @@ from utils import plotters as up
 from datasets import mitdb as dm
 from matplotlib import pyplot as plt
 
-print 'yo'
+def main():
+    dm.create_datasets()
+
+if __name__ == '__main__':
+    main()
