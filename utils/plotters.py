@@ -118,3 +118,58 @@ def show_objective():
     plt.xlabel('Time [s]')
     plt.xlim([0, 2.5])
     plt.show()
+
+def show_objective_part2():
+    """ For the model """
+    # Choose a record
+    records = dm.get_records()
+    path = records[13]
+    record = wf.rdsamp(path)
+    ann = wf.rdann(path, 'atr')
+
+    chid = 0
+    print 'File:', path
+    print 'Channel:', record.signame[chid]
+
+    cha = record.p_signals[:, chid]
+
+    # These were found manually
+    sta = 184000
+    end = sta + 1000
+    times = np.arange(end-sta, dtype = 'float')
+    times /= record.fs
+
+    # Extract the annotations for that fragment
+    where = (sta < ann.annsamp) & (ann.annsamp < end)
+    samples = ann.annsamp[where] - sta
+    print samples
+
+    # Prepare dirac-comb type of labels
+    qrs_values = np.zeros_like(times)
+    qrs_values[samples] = 1
+
+    # Prepare gaussian-comb type of labels
+    kernel = ss.hamming(36)
+    qrs_gauss = np.convolve(kernel,
+                            qrs_values,
+                            mode = 'same')
+
+    # Make the plots
+    fig = plt.figure()
+    ax1 = fig.add_subplot(2,1,1)
+    ax1.plot(times, cha[sta : end])
+    ax1.set_title('Input', loc = 'left')
+
+    ax2 = fig.add_subplot(2,1,2, sharex=ax1)
+    ax2.plot(times,
+             qrs_gauss,
+             'C3',
+             lw = 4,
+             alpha = 0.888)
+    ax2.set_title('Output', loc = 'left')
+    ax1.grid()
+    ax2.grid()
+    plt.setp(ax1.get_xticklabels(), visible=False)
+    plt.xlabel('Time [s]')
+    plt.xlim([0, 2.5])
+    plt.show()
