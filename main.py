@@ -1,3 +1,5 @@
+import matplotlib as mpl
+mpl.use('Agg')
 import wfdb as wf
 import numpy as np
 from utils import storage as us

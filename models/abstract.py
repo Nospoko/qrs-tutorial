@@ -357,21 +357,21 @@ class FirstTry(AbstractNet):
             # Add the channels dimension
             c1 = tf.expand_dims(self.putin, -1)
             c1 = self.conv(c1,
-                           filters = 12,
-                           width = 7,
+                           filters = 32,
+                           width = 32,
                            stride = 2)
 
         with tf.name_scope('conv2'):
             c2 = self.conv(c1,
-                           filters = 24,
-                           width = 7,
+                           filters = 64,
+                           width = 48,
                            stride = 2)
 
         with tf.name_scope('conv3'):
             c3 = self.conv(c2,
-                           filters = 36,
-                           width = 11,
-                           stride = 5)
+                           filters = 72,
+                           width = 32,
+                           stride = 3)
 
         print 'Shrinked:', c3.get_shape().as_list()
 
@@ -381,7 +381,7 @@ class FirstTry(AbstractNet):
             r1 = tf.expand_dims(r1, -1)
             r1 = self.conv(r1,
                            filters = 1,
-                           width = 169,
+                           width = 61,
                            stride = 1)
 
         # with tf.name_scope('deconv1'):
