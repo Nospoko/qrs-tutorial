@@ -2,6 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 from utils import various as uv
+from matplotlib import pyplot as plt
 
 class AbstractNet(object):
     """ Common interface """
@@ -15,9 +16,9 @@ class AbstractNet(object):
         self.params = self.consume_params(params)
 
         # Training parameters
-        self.lrs        = [0.001, 0.0003, 0.00005, 1e-5]
+        self.lrs        = [0.1, 0.003, 0.0005, 1e-4]
         self.eons       = len(self.lrs)
-        self.epochs     = 100
+        self.epochs     = 1000
         self.batch_size = 256
 
         # Meta factors
@@ -217,6 +218,22 @@ class AbstractNet(object):
 
         return score
 
+    def consume(self, signals, reality):
+        """ Calculate loss """
+        # Start tensorflowing
+        with tf.Session(graph = self.graph) as sess:
+            # Load weights and biases
+            saver = tf.train.Saver()
+            saver.restore(sess, self.savepath)
+
+            # Feed the graph
+            fd = { self.putin : signals,
+                   self.real : reality }
+
+            score = sess.run(self.loss, fd)
+
+        return score
+
 class FirstTry(AbstractNet):
     """ Simplest class to solve the problem """
     def __init__(self, netname, params = None):
@@ -226,9 +243,11 @@ class FirstTry(AbstractNet):
 
         # Extract the parameters
         self.n_input = self.params[0]
-        self.n_output = self.params[1]
+        self.n_output = self.n_input
 
-        self.stddev = 0.1
+        self.stddev = 0.01
+        self.batch_size = 128
+        self.set_epochs(300)
 
         # Make the graphs
         self.build_net()
@@ -237,10 +256,10 @@ class FirstTry(AbstractNet):
         """ Wrapper for a full conv/pool layer """
         # Deduce the required filter shapes
         v_shape = value.get_shape().as_list()
-        in_width = v_shape[2]
+        in_filters = v_shape[2]
 
         # Prepare weights for training
-        w_shape = [width, in_width, filters]
+        w_shape = [width, in_filters , filters]
         weights = tf.random_normal(w_shape, stddev = self.stddev)
         weights = tf.Variable(weights, name = 'weights')
 
@@ -249,6 +268,8 @@ class FirstTry(AbstractNet):
                            weights,
                            stride = stride,
                            padding = 'SAME')
+
+        out = tf.nn.relu(out)
 
         b_shape = [filters]
         bias = tf.random_normal(b_shape, stddev = self.stddev)
@@ -260,10 +281,51 @@ class FirstTry(AbstractNet):
 
         return out
 
+    def convt(self, values, filters, width, stretch):
+        """ Transposed convolution """
+        # Add dimension to fit the conv2d_tranpose
+        # We want to use NHWC format and have height = 1
+        # So we add a dimension after the first existing one
+        values = tf.expand_dims(values, 2)
+
+        # Extract the number of input channels
+        in_shape = values.get_shape().as_list()
+        in_filters = in_shape[3]
+
+        # Prepare the weights to be learned
+        w_shape = [1, width, filters, in_filters]
+        weights = tf.random_normal(w_shape)
+        weights = tf.Variable(weights, name = 'weights')
+
+        # Infere the output shape
+        output_shape = in_shape[:]
+        output_shape[3] = filters
+        output_shape[1] *= stretch
+        # output_shape[0] = -1
+
+        out = tf.nn.conv2d_transpose(values,
+                                     weights,
+                                     output_shape,
+                                     strides = [1, stretch, 1, 1],
+                                     padding = 'SAME')
+
+        # Get rid of the added dimension
+        out = tf.squeeze(out, 2)
+
+        b_shape = [filters]
+        bias = tf.random_normal(b_shape, stddev = self.stddev)
+        bias = tf.Variable(bias, name = 'bias')
+
+        out += bias
+
+        print 'DeConv:', out.get_shape().as_list()
+
+        return out
+                                     
     def make_graph(self):
         """ Construct the pipeline """
         # Connection with the input data
-        in_shape = [None, self.n_input]
+        in_shape = [self.batch_size, self.n_input]
         self.putin = tf.placeholder(tf.float32, in_shape)
         print 'Input:', in_shape
 
@@ -286,28 +348,39 @@ class FirstTry(AbstractNet):
             c3 = self.conv(c2,
                            filters = 8,
                            width = 13,
-                           stride = 4)
+                           stride = 5)
 
         print 'Shrinked:', c3.get_shape().as_list()
 
-        self.loss = tf.reduce_sum(c3)
-
-        return
-
         # Stretch up (with transposed convolutions)
         with tf.name_scope('deconv1'):
-            d1 = uo.convt(c3,
-                          filters = 8,
-                          stretch = 2)
+            d1 = self.convt(c3,
+                            filters = 4,
+                            width = 13,
+                            stretch = 2)
 
         with tf.name_scope('deconv2'):
-            d2 = uo.convt(d1,
-                          filters = 8,
-                          stretch = 2)
+            d2 = self.convt(d1,
+                            filters = 4,
+                            width = 13,
+                            stretch = 2)
 
         with tf.name_scope('deconv3'):
-            d3 = uo.convt(d2,
-                          filters = 8,
-                          stretch = 4)
+            d3 = self.convt(d2,
+                            filters = 1,
+                            width = 13,
+                            stretch = 5)
+
+            # Bring back to shape
+            d3 = tf.squeeze(d3, 2)
+            d3 = tf.nn.sigmoid(d3)
+
 
         print 'Stretched:', d3.get_shape().as_list()
+
+        # Connect to the ground truth
+        self.inference = d3
+        self.real = tf.placeholder(tf.float32, in_shape)
+        self.loss = tf.nn.l2_loss(self.real - self.inference)
+        self.loss /= self.batch_size
+

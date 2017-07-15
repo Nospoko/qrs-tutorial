@@ -52,6 +52,9 @@ class Dataset(object):
         signals = self.training_set['signals'][ids]
         labels = self.training_set['labels'][ids]
 
+        # Get rid of the dirac solutions
+        labels = labels[:, 1, :]
+
         return signals, labels
 
             
