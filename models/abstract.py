@@ -378,6 +378,7 @@ class FirstTry(AbstractNet):
         # Stretch up (with transposed convolutions)
         with tf.name_scope('deconv2'):
             r1 = tf.reshape(c3, [self.batch_size, -1])
+            r1 = tf.nn.softmax(r1)
             r1 = tf.expand_dims(r1, -1)
             r1 = self.conv(r1,
                            filters = 1,

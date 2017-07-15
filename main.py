@@ -31,27 +31,36 @@ def training():
     print 'Final score:', score
 
 def main():
-    dm.create_datasets()
+    # dm.create_datasets()
 
     dataset = us.Dataset('data')
 
     params = [300]
     netname = 'foo'
     model = ma.FirstTry(netname, params)
+    model.set_epochs(1000)
+    lrs = [0.003, 0.0007, 0.0001]
+    model.set_learning_rates(lrs)
 
     model.train(dataset)
 
     # Extract the validation dataset
     si = dataset.validation_set['signals'][:128]
-    la = dataset.validation_set['labels'][:128]
+    la = dataset.validation_set['labels']
+    la = la[:, 1, :]
+    la = la[:128]
 
     loss = model.consume(si, la)
     print 'Validation loss', loss
 
     score = model.process(si)
-    plt.plot(score[12])
-    plt.plot(la[12])
-    plt.savefig('tmp/result.png')
+    its = [12, 15, 32, 33]
+    for it in its:
+        plt.plot(score[it])
+        plt.plot(la[it])
+        savepath = 'tmp/result-{}.png'.format(it)
+        plt.savefig(savepath)
+        plt.clf()
 
 if __name__ == '__main__':
     main()
