@@ -163,7 +163,7 @@ class AbstractNet(object):
                     # Conventional debugging
                     self.losses.append(loss)
                     dbg = 'Eon: {}, Epoch: {}, loss: {}'
-                    if et % 60 == 0:
+                    if et % 10 == 0:
                         print dbg.format(en, et, loss)
                     if et % 100 == 0:
                         self.validate()
@@ -364,7 +364,7 @@ class FirstTry(AbstractNet):
         with tf.name_scope('conv2'):
             c2 = self.conv(c1,
                            filters = 64,
-                           width = 128,
+                           width = 64,
                            stride = 1)
 
         with tf.name_scope('conv3'):
@@ -375,20 +375,26 @@ class FirstTry(AbstractNet):
 
         with tf.name_scope('conv4'):
             c4 = self.conv(c3,
-                           filters = 64,
-                           width = 10,
+                           filters = 32,
+                           width = 32,
                            stride = 1)
 
-        print 'Shrinked:', c3.get_shape().as_list()
+        with tf.name_scope('conv5'):
+            c5 = self.conv(c4,
+                           filters = 16,
+                           width = 16,
+                           stride = 1)
+
+        print 'Shrinked:', c5.get_shape().as_list()
 
         # Stretch up (with transposed convolutions)
         with tf.name_scope('deconv2'):
-            r1 = tf.reshape(c4, [self.batch_size, -1])
+            r1 = tf.reshape(c5, [self.batch_size, -1])
             r1 = tf.nn.softmax(r1)
             r1 = tf.expand_dims(r1, -1)
             r1 = self.conv(r1,
                            filters = 1,
-                           width = 85,
+                           width = 229,
                            stride = 1)
 
         # with tf.name_scope('deconv1'):
