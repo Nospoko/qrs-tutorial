@@ -179,7 +179,7 @@ class AbstractNet(object):
         # Learning curve
         savepath = 'tmp/{}.png'.format(self.netname)
         plt.clf()
-        plt.plot(self.losses[-500:],
+        plt.plot(self.losses,
                  '--o',
                  lw = 2,
                  ms = 10,
@@ -241,13 +241,17 @@ class FirstTry(AbstractNet):
         # Init the parent
         AbstractNet.__init__(self, netname, params)
 
+        # lrs = [0.5, 0.003, 0.0005, 1e-4]
+        lrs = [0.003, 0.0007]
+        self.set_learning_rates(lrs)
+
         # Extract the parameters
         self.n_input = self.params[0]
         self.n_output = self.n_input
 
-        self.stddev = 0.01
+        self.stddev = 0.5
         self.batch_size = 128
-        self.set_epochs(300)
+        self.set_epochs(1500)
 
         # Make the graphs
         self.build_net()
@@ -267,15 +271,15 @@ class FirstTry(AbstractNet):
         out = tf.nn.conv1d(value,
                            weights,
                            stride = stride,
-                           padding = 'SAME')
-
-        out = tf.nn.relu(out)
+                           padding = 'VALID')
 
         b_shape = [filters]
         bias = tf.random_normal(b_shape, stddev = self.stddev)
         bias = tf.Variable(bias, name = 'bias')
 
         out += bias
+
+        out = tf.nn.tanh(out)
 
         print 'Conv:', out.get_shape().as_list()
 
@@ -322,6 +326,25 @@ class FirstTry(AbstractNet):
 
         return out
                                      
+    def full_layer(self, putin, out_width):
+        """ Matmul and bias add """
+        # Prepare weights
+        in_width = putin.get_shape().as_list()[1]
+        w1_shape = [in_width, out_width]
+        w1 = tf.random_normal(w1_shape, stddev = self.std)
+        w1 = tf.Variable(w1)
+
+        # Propagate
+        out = tf.matmul(putin, w1)
+
+        # Make the bias
+        # b1 = 0.1 * tf.ones(shape = [out_width])
+        b1 = tf.random_normal(shape = [out_width])
+        b1 = tf.Variable(b1)
+        out += b1
+
+        return out
+
     def make_graph(self):
         """ Construct the pipeline """
         # Connection with the input data
@@ -334,53 +357,44 @@ class FirstTry(AbstractNet):
             # Add the channels dimension
             c1 = tf.expand_dims(self.putin, -1)
             c1 = self.conv(c1,
-                           filters = 8,
-                           width = 13,
+                           filters = 12,
+                           width = 7,
                            stride = 2)
 
         with tf.name_scope('conv2'):
             c2 = self.conv(c1,
-                           filters = 8,
-                           width = 13,
+                           filters = 24,
+                           width = 7,
                            stride = 2)
 
         with tf.name_scope('conv3'):
             c3 = self.conv(c2,
-                           filters = 8,
-                           width = 13,
+                           filters = 36,
+                           width = 11,
                            stride = 5)
 
         print 'Shrinked:', c3.get_shape().as_list()
 
         # Stretch up (with transposed convolutions)
-        with tf.name_scope('deconv1'):
-            d1 = self.convt(c3,
-                            filters = 4,
-                            width = 13,
-                            stretch = 2)
-
         with tf.name_scope('deconv2'):
-            d2 = self.convt(d1,
-                            filters = 4,
-                            width = 13,
-                            stretch = 2)
+            r1 = tf.reshape(c3, [self.batch_size, -1])
+            r1 = tf.expand_dims(r1, -1)
+            r1 = self.conv(r1,
+                           filters = 1,
+                           width = 169,
+                           stride = 1)
 
-        with tf.name_scope('deconv3'):
-            d3 = self.convt(d2,
-                            filters = 1,
-                            width = 13,
-                            stretch = 5)
+        # with tf.name_scope('deconv1'):
+        #     f1 = tf.reshape(r1, [self.batch_size, -1])
+        #     f1 = self.full_layer(f1, self.n_input)
+        #     d3 = tf.nn.sigmoid(f1)
 
-            # Bring back to shape
-            d3 = tf.squeeze(d3, 2)
-            d3 = tf.nn.sigmoid(d3)
-
-
-        print 'Stretched:', d3.get_shape().as_list()
+        print 'Stretched:', r1.get_shape().as_list()
 
         # Connect to the ground truth
-        self.inference = d3
-        self.real = tf.placeholder(tf.float32, in_shape)
-        self.loss = tf.nn.l2_loss(self.real - self.inference)
-        self.loss /= self.batch_size
+        with tf.name_scope('loss'):
+            self.inference = tf.squeeze(r1, 2)
+            self.real = tf.placeholder(tf.float32, in_shape)
+            self.loss = tf.nn.l2_loss(self.real - self.inference)
+            self.loss /= self.batch_size
 
