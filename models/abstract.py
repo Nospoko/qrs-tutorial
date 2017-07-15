@@ -358,7 +358,7 @@ class FirstTry(AbstractNet):
             c1 = tf.expand_dims(self.putin, -1)
             c1 = self.conv(c1,
                            filters = 32,
-                           width = 128,
+                           width = 32,
                            stride = 1)
 
         with tf.name_scope('conv2'):
@@ -370,7 +370,7 @@ class FirstTry(AbstractNet):
         with tf.name_scope('conv3'):
             c3 = self.conv(c2,
                            filters = 64,
-                           width = 32,
+                           width = 64,
                            stride = 1)
 
         with tf.name_scope('conv4'):
@@ -382,7 +382,7 @@ class FirstTry(AbstractNet):
         with tf.name_scope('conv5'):
             c5 = self.conv(c4,
                            filters = 16,
-                           width = 16,
+                           width = 32,
                            stride = 1)
 
         print 'Shrinked:', c5.get_shape().as_list()
@@ -391,10 +391,14 @@ class FirstTry(AbstractNet):
         with tf.name_scope('deconv2'):
             r1 = tf.reshape(c5, [self.batch_size, -1])
             r1 = tf.nn.softmax(r1)
-            r1 = tf.expand_dims(r1, -1)
-            r1 = self.conv(r1,
+
+            r2 = self.full_layer(r1, self.n_input + 127)
+            r2 = tf.nn.softmax(r2)
+
+            r2 = tf.expand_dims(r2, -1)
+            r2 = self.conv(r2,
                            filters = 1,
-                           width = 229,
+                           width = 128,
                            stride = 1)
 
         # with tf.name_scope('deconv1'):
@@ -402,11 +406,11 @@ class FirstTry(AbstractNet):
         #     f1 = self.full_layer(f1, self.n_input)
         #     d3 = tf.nn.sigmoid(f1)
 
-        print 'Stretched:', r1.get_shape().as_list()
+        print 'Stretched:', r2.get_shape().as_list()
 
         # Connect to the ground truth
         with tf.name_scope('loss'):
-            self.inference = tf.squeeze(r1, 2)
+            self.inference = tf.squeeze(r2, 2)
             self.real = tf.placeholder(tf.float32, in_shape)
             self.loss = tf.nn.l2_loss(self.real - self.inference)
             self.loss /= self.batch_size
