@@ -37,22 +37,31 @@ def main():
 
     params = [300]
     netname = 'foo'
+
+    # Create model
     model = ma.FirstTry(netname, params)
+
+    # How much data will it see
     model.set_epochs(1000)
+    model.set_batch_size(512)
+
+    # Learning tactic
     lrs = [0.003, 0.0007, 0.0001]
     model.set_learning_rates(lrs)
 
     model.train(dataset)
 
     # Extract the validation dataset
-    si = dataset.validation_set['signals']
-    la = dataset.validation_set['labels']
-    la = la[:, 1, :]
-    la = la
+    howmany = 1000
+    si, la = dataset.test_batch(howmany)
 
+    # Calculate loss rescaled 'per-example'
     loss = model.consume(si, la)
+    loss = loss * model.batch_size / howmany
+    
     print 'Validation loss', loss
 
+    # Show some results
     score = model.process(si)
     its = range(500)
     its = its[::17]

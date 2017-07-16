@@ -4,6 +4,10 @@ import tensorflow as tf
 from utils import various as uv
 from matplotlib import pyplot as plt
 
+"""
+    tensorboard --logdir=saved/netname
+"""
+
 class AbstractNet(object):
     """ Common interface """
     def __init__(self, netname, params = None):
@@ -17,7 +21,6 @@ class AbstractNet(object):
 
         # Training parameters
         self.lrs        = [0.1, 0.003, 0.0005, 1e-4]
-        self.eons       = len(self.lrs)
         self.epochs     = 1000
         self.batch_size = 256
 
@@ -52,10 +55,13 @@ class AbstractNet(object):
 
         return val
 
+    def set_batch_size(self, batch_size):
+        """ Setter """
+        self.batch_size = batch_size
+
     def set_learning_rates(self, rates):
         """ Feed me list """
         self.lrs  = rates
-        self.eons = len(rates)
 
     def consume_params(self, params):
         """ Separate training from inference """
@@ -91,56 +97,6 @@ class AbstractNet(object):
             self.prepare_board()
             self.prepare_training()
 
-    def full_layer(self, putin, out_width):
-        """ Matmul and bias add """
-        # Prepare weights
-        in_width = putin.get_shape().as_list()[1]
-        w1_shape = [in_width, out_width]
-        w1 = tf.random_normal(w1_shape, stddev = self.std)
-        w1 = tf.Variable(w1)
-
-        # Propagate
-        out = tf.matmul(putin, w1)
-
-        # Make the bias
-        # b1 = 0.1 * tf.ones(shape = [out_width])
-        b1 = tf.random_normal(shape = [out_width])
-        b1 = tf.Variable(b1)
-        out += b1
-
-        return out
-
-    def conv_layer(self, putin, f = 1, s = 1):
-        """ Name it, use f filters """
-        # Input size deduction
-        in_layers = putin.get_shape().as_list()[3]
-
-        # Prepare first conv layer
-        w1_shape = [self.f_n_size,
-                    self.f_m_size,
-                    in_layers,
-                    f]
-
-        wc1 = tf.random_normal(w1_shape, stddev = self.std)
-        wc1 = tf.Variable(wc1, name = 'filters')
-        c1 = tf.nn.conv2d(putin,
-                          wc1,
-                          strides = [1, 1, 1, 1],
-                          padding = 'SAME')
-
-        bc1 = tf.constant(0.1, shape = [f])
-        bc1 = tf.Variable(bc1, name = 'biases')
-
-        c1 += bc1
-
-        c1 = tf.nn.tanh(c1)
-
-        c1 = tf.nn.max_pool(c1,
-                            ksize = [1, 1, s, 1],
-                            strides = [1, 1, s, 1],
-                            padding = 'SAME')
-        return c1
-
     def set_epochs(self, howmany):
         """ Setter """
         self.epochs = howmany
@@ -158,26 +114,24 @@ class AbstractNet(object):
 
             # Iteration iterator
             it = 0
-
-            for l_rate, en in zip(self.lrs, range(self.eons)):
+            for en, l_rate in enumerate(self.lrs):
                 # Varying learning rate mechanism
                 sess.run(tf.assign(self.learning_rate, l_rate))
 
                 # Run the epochs
                 for et in range(self.epochs):
-
+                    # Load batch
                     bx, by = dataset.next_batch(self.batch_size)
-                    # FIXME Clean this up
 
                     fd = { self.putin  : bx,
                            self.real   : by }
 
                     ops = [self.loss,
                            self.train_op,
-                           self.summaries]
+                           self.train_summary]
 
-                    loss, _,  ss = sess.run(ops,
-                                            feed_dict = fd)
+                    loss, _, ss = sess.run(ops,
+                                           feed_dict = fd)
 
                     # Tensorboard
                     self.t_writer.add_summary(ss, it)
@@ -185,19 +139,28 @@ class AbstractNet(object):
 
                     # Conventional debugging
                     self.losses.append(loss)
-                    dbg = 'Eon: {}, Epoch: {}, loss: {}'
                     if et % 10 == 0:
-                        print dbg.format(en, et, loss)
+                        # Prepare validation data/ops
+                        vx, vy = dataset.validation_batch(self.batch_size)
+                        vdic = { self.putin : vx,
+                                 self.real  : vy }
+                        vops = [self.loss, self.valid_summary]
+
+                        # Validation run
+                        vloss, vsum = sess.run(vops, vdic)
+                        self.t_writer.add_summary(vsum, it)
+                        dbg = 'Eon: {}, Epoch: {}, loss: {}, valid: {}'
+                        print dbg.format(en, et, loss, vloss)
+
                     if et % 100 == 0:
-                        self.validate()
-                        # print '! Learning rate:', l_rate
+                        self.produce_plots()
 
             # Save results
             saver = tf.train.Saver()
             saver.save(sess, self.savepath)
             print 'Trained model saved to: ', self.savepath
 
-    def validate(self):
+    def produce_plots(self):
         """ Make some plots """
         # Learning curve
         savepath = 'tmp/{}.png'.format(self.netname)
@@ -219,14 +182,13 @@ class AbstractNet(object):
         """ Tensorboard """
         # Try summaries
         with tf.name_scope('summaries'):
-            tf.summary.scalar('loss', self.loss)
-
-        self.summaries = tf.summary.merge_all()
+            self.train_summary = tf.summary.scalar('training_loss', self.loss)
+            self.valid_summary = tf.summary.scalar('validation_loss', self.loss)
 
         self.t_writer = tf.summary.FileWriter(self.boardpath,
                                               self.graph)
 
-    def process(self, batch):
+    def process(self, signals):
         """ Analyze one batch """
         # Start tensorflowing
         with tf.Session(graph = self.graph) as sess:
@@ -235,7 +197,7 @@ class AbstractNet(object):
             saver.restore(sess, self.savepath)
 
             # Feed the graph
-            fd = { self.putin : batch }
+            fd = { self.putin : signals }
 
             score = sess.run(self.inference, fd)
 
