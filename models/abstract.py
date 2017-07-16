@@ -361,8 +361,7 @@ class FirstTry(AbstractNet):
         out = tf.matmul(putin, w1)
 
         # Make the bias
-        # b1 = 0.1 * tf.ones(shape = [out_width])
-        b1 = tf.random_normal(shape = [out_width])
+        b1 = tf.random_normal(shape = [out_width], stddev = self.std)
         b1 = tf.Variable(b1)
         out += b1
 
@@ -371,7 +370,7 @@ class FirstTry(AbstractNet):
     def make_graph(self):
         """ Construct the pipeline """
         # Connection with the input data
-        in_shape = [self.batch_size, self.n_input]
+        in_shape = [None, self.n_input]
         self.putin = tf.placeholder(tf.float32, in_shape)
         print 'Input:', in_shape
 
@@ -408,31 +407,28 @@ class FirstTry(AbstractNet):
                            width = 32,
                            stride = 1)
 
-        print 'Shrinked:', c5.get_shape().as_list()
-
         # Stretch up (with transposed convolutions)
-        with tf.name_scope('deconv2'):
-            r1 = tf.reshape(c5, [self.batch_size, -1])
+        with tf.name_scope('softmax1'):
+            c5_shape = c5.get_shape().as_list()
+            r1_width = c5_shape[1] * c5_shape[2]
+            r1 = tf.reshape(c5, [-1, r1_width])
             r1 = tf.nn.softmax(r1)
 
+        with tf.name_scope('full_softmax'):
             r2 = self.full_layer(r1, self.n_input + 127)
             r2 = tf.nn.softmax(r2)
 
+        with tf.name_scope('conv_out'):
             r2 = tf.expand_dims(r2, -1)
             r2 = self.conv(r2,
                            filters = 1,
                            width = 128,
                            stride = 1)
 
-        # with tf.name_scope('deconv1'):
-        #     f1 = tf.reshape(r1, [self.batch_size, -1])
-        #     f1 = self.full_layer(f1, self.n_input)
-        #     d3 = tf.nn.sigmoid(f1)
-
         print 'Stretched:', r2.get_shape().as_list()
 
         # Connect to the ground truth
-        with tf.name_scope('loss'):
+        with tf.name_scope('inference'):
             self.inference = tf.squeeze(r2, 2)
             self.real = tf.placeholder(tf.float32, in_shape)
             self.loss = tf.nn.l2_loss(self.real - self.inference)

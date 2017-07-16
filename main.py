@@ -38,23 +38,24 @@ def main():
     params = [300]
     netname = 'foo'
     model = ma.FirstTry(netname, params)
-    model.set_epochs(3000)
+    model.set_epochs(1000)
     lrs = [0.003, 0.0007, 0.0001]
     model.set_learning_rates(lrs)
 
     model.train(dataset)
 
     # Extract the validation dataset
-    si = dataset.validation_set['signals'][:128]
+    si = dataset.validation_set['signals']
     la = dataset.validation_set['labels']
     la = la[:, 1, :]
-    la = la[:128]
+    la = la
 
     loss = model.consume(si, la)
     print 'Validation loss', loss
 
     score = model.process(si)
-    its = [12, 15, 32, 33]
+    its = range(500)
+    its = its[::17]
     for it in its:
         plt.plot(score[it])
         plt.plot(la[it])
