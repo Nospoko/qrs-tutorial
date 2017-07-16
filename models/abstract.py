@@ -140,8 +140,8 @@ class AbstractNet(object):
                     # Conventional debugging
                     self.losses.append(loss)
                     if et % 10 == 0:
-                        # Prepare validation data/ops
-                        vx, vy = dataset.validation_batch(self.batch_size)
+                        # Prepare validation data/ops (on a larger batch)
+                        vx, vy = dataset.validation_batch(1000)
                         vdic = { self.putin : vx,
                                  self.real  : vy }
                         vops = [self.loss, self.valid_summary]
@@ -393,6 +393,9 @@ class FirstTry(AbstractNet):
         with tf.name_scope('inference'):
             self.inference = tf.squeeze(r2, 2)
             self.real = tf.placeholder(tf.float32, in_shape)
-            self.loss = tf.nn.l2_loss(self.real - self.inference)
-            self.loss /= self.batch_size
+
+            # Make the loss op
+            diff = self.real - self.inference
+            power = tf.pow(diff, 2)
+            self.loss = tf.reduce_mean(power)
 

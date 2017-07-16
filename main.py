@@ -32,7 +32,6 @@ def training():
 
 def main():
     # dm.create_datasets()
-
     dataset = us.Dataset('data')
 
     params = [300]
@@ -42,8 +41,8 @@ def main():
     model = ma.FirstTry(netname, params)
 
     # How much data will it see
-    model.set_epochs(1000)
-    model.set_batch_size(512)
+    model.set_epochs(500)
+    model.set_batch_size(32)
 
     # Learning tactic
     lrs = [0.003, 0.0007, 0.0001]
@@ -55,9 +54,8 @@ def main():
     howmany = 1000
     si, la = dataset.test_batch(howmany)
 
-    # Calculate loss rescaled 'per-example'
+    # Calculate loss
     loss = model.consume(si, la)
-    loss = loss * model.batch_size / howmany
     
     print 'Validation loss', loss
 
@@ -71,6 +69,15 @@ def main():
         savepath = 'tmp/result-{}.png'.format(it)
         plt.savefig(savepath)
         plt.clf()
+
+    # Also extract the final filter
+    filtr = model.get_tensor('conv_out/weights:0')
+    filtr = filtr.reshape([len(filtr)])
+
+    # To png
+    plt.plot(filtr)
+    plt.savefig('tmp/filter.png')
+    plt.clf()
 
 if __name__ == '__main__':
     main()
