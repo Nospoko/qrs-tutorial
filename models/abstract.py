@@ -29,6 +29,29 @@ class AbstractNet(object):
         self.losses = []
         self.v_losses = []
 
+    def print_ops(self):
+        """ Viewer """
+        # Start tensorflowing
+        with tf.Session(graph = self.graph) as sess:
+            # Load weights and biases
+            saver = tf.train.Saver()
+            saver.restore(sess, self.savepath)
+            ops = self.graph.get_operations()
+
+        return ops
+
+    def get_tensor(self, name):
+        """ Value by name """
+        with tf.Session(graph = self.graph) as sess:
+            # Load weights and biases
+            saver = tf.train.Saver()
+            saver.restore(sess, self.savepath)
+
+            tensor = self.graph.get_tensor_by_name(name)
+            val = sess.run(tensor)
+
+        return val
+
     def set_learning_rates(self, rates):
         """ Feed me list """
         self.lrs  = rates

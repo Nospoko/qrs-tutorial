@@ -38,7 +38,7 @@ def main():
     params = [300]
     netname = 'foo'
     model = ma.FirstTry(netname, params)
-    model.set_epochs(1000)
+    model.set_epochs(3000)
     lrs = [0.003, 0.0007, 0.0001]
     model.set_learning_rates(lrs)
 
