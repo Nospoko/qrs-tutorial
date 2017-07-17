@@ -123,8 +123,8 @@ class AbstractNet(object):
                     # Load batch
                     bx, by = dataset.next_batch(self.batch_size)
 
-                    fd = { self.putin  : bx,
-                           self.real   : by }
+                    fd = { self._input  : bx,
+                           self._output   : by }
 
                     ops = [self.loss,
                            self.train_op,
@@ -142,8 +142,8 @@ class AbstractNet(object):
                     if et % 10 == 0:
                         # Prepare validation data/ops (on a larger batch)
                         vx, vy = dataset.validation_batch(1000)
-                        vdic = { self.putin : vx,
-                                 self.real  : vy }
+                        vdic = { self._input : vx,
+                                 self._output  : vy }
                         vops = [self.loss, self.valid_summary]
 
                         # Validation run
@@ -197,7 +197,7 @@ class AbstractNet(object):
             saver.restore(sess, self.savepath)
 
             # Feed the graph
-            fd = { self.putin : signals }
+            fd = { self._input : signals }
 
             score = sess.run(self.inference, fd)
 
@@ -212,14 +212,18 @@ class AbstractNet(object):
             saver.restore(sess, self.savepath)
 
             # Feed the graph
-            fd = { self.putin : signals,
-                   self.real : reality }
+            fd = { self._input : signals,
+                   self._output : reality }
 
             score = sess.run(self.loss, fd)
 
         return score
 
-class FirstTry(AbstractNet):
+    def make_graph():
+        """ Please implement me """
+        print 'Please implement the make_graph() method'
+
+class ConvEncoder(AbstractNet):
     """ Simplest class to solve the problem """
     def __init__(self, netname, params = None):
         """ Constructor """
@@ -241,10 +245,10 @@ class FirstTry(AbstractNet):
         # Make the graphs
         self.build_net()
 
-    def conv(self, value, filters, width, stride):
+    def conv(self, values, filters, width, stride):
         """ Wrapper for a full conv/pool layer """
         # Deduce the required filter shapes
-        v_shape = value.get_shape().as_list()
+        v_shape = values.get_shape().as_list()
         in_filters = v_shape[2]
 
         # Prepare weights for training
@@ -253,7 +257,7 @@ class FirstTry(AbstractNet):
         weights = tf.Variable(weights, name = 'weights')
 
         # Convolve
-        out = tf.nn.conv1d(value,
+        out = tf.nn.conv1d(values,
                            weights,
                            stride = stride,
                            padding = 'VALID')
@@ -311,16 +315,16 @@ class FirstTry(AbstractNet):
 
         return out
                                      
-    def full_layer(self, putin, out_width):
+    def full_layer(self, values, out_width):
         """ Matmul and bias add """
         # Prepare weights
-        in_width = putin.get_shape().as_list()[1]
+        in_width = values.get_shape().as_list()[1]
         w1_shape = [in_width, out_width]
         w1 = tf.random_normal(w1_shape, stddev = self.std)
         w1 = tf.Variable(w1)
 
         # Propagate
-        out = tf.matmul(putin, w1)
+        out = tf.matmul(values, w1)
 
         # Make the bias
         b1 = tf.random_normal(shape = [out_width], stddev = self.std)
@@ -333,13 +337,13 @@ class FirstTry(AbstractNet):
         """ Construct the pipeline """
         # Connection with the input data
         in_shape = [None, self.n_input]
-        self.putin = tf.placeholder(tf.float32, in_shape)
+        self._input = tf.placeholder(tf.float32, in_shape)
         print 'Input:', in_shape
 
         # Shrink down
         with tf.name_scope('conv1'):
             # Add the channels dimension
-            c1 = tf.expand_dims(self.putin, -1)
+            c1 = tf.expand_dims(self._input, -1)
             c1 = self.conv(c1,
                            filters = 32,
                            width = 32,
@@ -392,10 +396,10 @@ class FirstTry(AbstractNet):
         # Connect to the ground truth
         with tf.name_scope('inference'):
             self.inference = tf.squeeze(r2, 2)
-            self.real = tf.placeholder(tf.float32, in_shape)
+            self._output = tf.placeholder(tf.float32, in_shape)
 
             # Make the loss op
-            diff = self.real - self.inference
+            diff = self._output - self.inference
             power = tf.pow(diff, 2)
             self.loss = tf.reduce_mean(power)
 
