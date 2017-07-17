@@ -403,3 +403,57 @@ class ConvEncoder(AbstractNet):
             power = tf.pow(diff, 2)
             self.loss = tf.reduce_mean(power)
 
+class FIREncoder(ConvEncoder):
+    """ Simplified version """
+    def make_graph(self):
+        """ Construct the pipeline """
+        # Connection with the input data
+        in_shape = [None, self.n_input]
+        self._input = tf.placeholder(tf.float32, in_shape)
+        print 'Input:', in_shape
+
+        # Shrink down
+        with tf.name_scope('conv1'):
+            # Add the channels dimension
+            c1 = tf.expand_dims(self._input, -1)
+            c1 = self.conv(c1,
+                           filters = 4,
+                           width = 128,
+                           stride = 1)
+
+        with tf.name_scope('conv2'):
+            c2 = self.conv(c1,
+                           filters = 4,
+                           width = 64,
+                           stride = 1)
+
+        with tf.name_scope('conv3'):
+            c3 = self.conv(c2,
+                           filters = 4,
+                           width = 32,
+                           stride = 1)
+
+        with tf.name_scope('shuffle'):
+            c3_shape = c3.get_shape().as_list()
+            r1_width = c3_shape[1] * c3_shape[2]
+
+            r1 = tf.reshape(c3, [-1, r1_width])
+            r1 = self.full_layer(r1, self.n_input + 127)
+
+        with tf.name_scope('conv_out'):
+            r2 = tf.expand_dims(r1, -1)
+            r2 = self.conv(r2,
+                           filters = 1,
+                           width = 128,
+                           stride = 1)
+
+        # Connect to the ground truth
+        with tf.name_scope('inference'):
+            self.inference = tf.squeeze(r2, 2)
+            self._output = tf.placeholder(tf.float32, in_shape)
+
+            # Make the loss op
+            diff = self._output - self.inference
+            power = tf.pow(diff, 2)
+            self.loss = tf.reduce_mean(power)
+

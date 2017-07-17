@@ -16,7 +16,7 @@ def main():
     netname = 'foo'
 
     # Create model
-    model = ma.FirstTry(netname, params)
+    model = ma.FIREncoder(netname, params)
 
     # How much data will it see
     model.set_epochs(500)
