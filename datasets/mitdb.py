@@ -73,7 +73,7 @@ def good_annotations():
 
     return good_annotations
 
-def make_dataset(records, savepath):
+def make_dataset(records, width, savepath):
     """ Inside an array """
     # Prepare containers
     signals, labels = [], []
@@ -88,7 +88,7 @@ def make_dataset(records, savepath):
         data = record.p_signals
 
         # Convert each channel into labeled fragments
-        signal, label = convert_data(data, annotations)
+        signal, label = convert_data(data, annotations, width)
 
         # Cumulate
         signals.append(signal)
@@ -102,7 +102,7 @@ def make_dataset(records, savepath):
     np.save(savepath, {'signals' : signals,
                        'labels'  : labels })
 
-def convert_data(data, annotations):
+def convert_data(data, annotations, width):
     """ Into a batch """
     # Prepare containers
     signals, labels = [], []
@@ -116,10 +116,9 @@ def convert_data(data, annotations):
         label = np.vstack([dirac, gauss])
 
         # Prepare the moving window
-        width = 300
         sta = 0
         end = width
-        stride = 300
+        stride = width
         while end <= len(channel):
             # Chop out the fragments
             s_frag = channel[sta : end]
@@ -148,12 +147,15 @@ def create_datasets():
     np.random.seed(666)
     np.random.shuffle(records)
 
+    # Define the data
+    width = 200
+
     # Make training
-    make_dataset(records[:30], 'data/training')
+    make_dataset(records[:30], width, 'data/training')
 
     # ... validation ...
-    make_dataset(records[30 : 39], 'data/validation')
+    make_dataset(records[30 : 39], width, 'data/validation')
 
     # ... and test
-    make_dataset(records[39 : 48], 'data/test')
+    make_dataset(records[39 : 48], width, 'data/test')
 

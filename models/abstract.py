@@ -367,17 +367,11 @@ class ConvEncoder(AbstractNet):
                            width = 32,
                            stride = 1)
 
-        with tf.name_scope('conv5'):
-            c5 = self.conv(c4,
-                           filters = 16,
-                           width = 32,
-                           stride = 1)
-
         # Stretch up (with transposed convolutions)
         with tf.name_scope('softmax1'):
-            c5_shape = c5.get_shape().as_list()
-            r1_width = c5_shape[1] * c5_shape[2]
-            r1 = tf.reshape(c5, [-1, r1_width])
+            c4_shape = c4.get_shape().as_list()
+            r1_width = c4_shape[1] * c4_shape[2]
+            r1 = tf.reshape(c4, [-1, r1_width])
             r1 = tf.nn.softmax(r1)
 
         with tf.name_scope('full_softmax'):
@@ -401,6 +395,7 @@ class ConvEncoder(AbstractNet):
             # Make the loss op
             diff = self._output - self.inference
             power = tf.pow(diff, 2)
+            power = tf.reduce_sum(power, 1)
             self.loss = tf.reduce_mean(power)
 
 class FIREncoder(ConvEncoder):

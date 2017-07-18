@@ -9,14 +9,14 @@ from models import abstract as ma
 from matplotlib import pyplot as plt
 
 def main():
-    # dm.create_datasets()
+    dm.create_datasets()
     dataset = us.Dataset('data')
 
-    params = [300]
+    params = [200]
     netname = 'foo'
 
     # Create model
-    model = ma.FIREncoder(netname, params)
+    model = ma.ConvEncoder(netname, params)
 
     # How much data will it see
     model.set_epochs(500)
